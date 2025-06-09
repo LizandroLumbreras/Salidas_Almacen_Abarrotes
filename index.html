@@ -4,28 +4,126 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Salidas - Almacen Abarrotes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f8f8f8;
+    }
+    h2 { text-align: center; }
+    input, button {
+      display: block;
+      width: 100%;
+      max-width: 480px;
+      margin: 10px auto;
+      padding: 12px;
+      font-size: 16px;
+    }
+    .info-box {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 480px;
+      margin: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #dc3545;
+      color: white;
+    }
+  </style>
 </head>
 <body>
   <h2>Salidas - Almacen Abarrotes</h2>
-  <p>Esta página registra <strong>salidas</strong> en <strong>Almacen_Abarrotes</strong>.</p>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <input type="text" id="codigoInput" placeholder="Código de producto..." />
+  <input type="number" id="cantidadInput" placeholder="Cantidad" min="1" value="1" />
+  <button onclick="agregarProducto()">Agregar a lista</button>
+  <div class="info-box" id="infoProducto"><p>Esperando código...</p></div>
+  <table>
+    <thead>
+      <tr><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Acción</th></tr>
+    </thead>
+    <tbody id="tablaBody"></tbody>
+  </table>
+  <button onclick="generarMovimiento()">📤 Generar Salida</button>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
-      authDomain: "inventariopv-643f1.firebaseapp.com",
-      projectId: "inventariopv-643f1",
-      storageBucket: "inventariopv-643f1.appspot.com",
-      messagingSenderId: "96242533231",
-      appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
-    };
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, query, where, getDocs, addDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  const firebaseConfig = {
+    apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+    authDomain: "inventariopv-643f1.firebaseapp.com",
+    projectId: "inventariopv-643f1",
+    storageBucket: "inventariopv-643f1.appspot.com",
+    messagingSenderId: "96242533231",
+    appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+  };
 
-    const ref = collection(db, "almacenes", "Almacen_Abarrotes", "salidas");
-    console.log("Conectado a:", ref);
-  </script>
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const productosRef = collection(db, "productos");
+  const almacenRef = collection(db, "almacenes", "Almacen_Abarrotes", "salidas");
+
+  let lista = [];
+  const tablaBody = document.getElementById("tablaBody");
+
+  window.agregarProducto = async () => {
+    const codigo = document.getElementById("codigoInput").value.trim();
+    const cantidad = parseInt(document.getElementById("cantidadInput").value);
+    if (!codigo || cantidad <= 0) return;
+    const q = query(productosRef, where("Codigo Barra", "==", codigo));
+    const snap = await getDocs(q);
+    let concepto = "Sin descripción";
+    snap.forEach(doc => concepto = doc.data()["Concepto"]);
+    lista.push({ codigo, concepto, cantidad });
+    renderTabla();
+    document.getElementById("codigoInput").value = "";
+    document.getElementById("cantidadInput").value = "1";
+  };
+
+  function renderTabla() {
+    tablaBody.innerHTML = "";
+    lista.forEach((item, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${item.codigo}</td><td>${item.concepto}</td><td>${item.cantidad}</td>
+        <td><button onclick="eliminar(${i})">❌</button></td>`;
+      tablaBody.appendChild(tr);
+    });
+  }
+
+  window.eliminar = (i) => {
+    lista.splice(i, 1);
+    renderTabla();
+  };
+
+  window.generarMovimiento = async () => {
+    if (lista.length === 0) return alert("Agrega productos primero.");
+    const qLast = query(almacenRef, orderBy("folio_num", "desc"), limit(1));
+    const snap = await getDocs(qLast);
+    let folio = 1;
+    snap.forEach(doc => folio = (doc.data().folio_num || 0) + 1);
+    const folioText = "SA-" + folio.toString().padStart(5, "0");
+    const fecha = new Date().toISOString();
+    for (const item of lista) {
+      await addDoc(almacenRef, {
+        ...item, fecha, folio, folio_num: folio, usuario: "admin"
+      });
+    }
+    alert("Movimiento guardado con folio " + folioText);
+    lista = [];
+    renderTabla();
+  };
+</script>
 </body>
 </html>
