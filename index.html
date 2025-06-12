@@ -78,19 +78,32 @@
   let lista = [];
   const tablaBody = document.getElementById("tablaBody");
 
-  window.agregarProducto = async () => {
-    const codigo = document.getElementById("codigoInput").value.trim();
-    const cantidad = parseInt(document.getElementById("cantidadInput").value);
-    if (!codigo || cantidad <= 0) return;
-    const q = query(productosRef, where("Codigo Barra", "==", codigo));
-    const snap = await getDocs(q);
-    let concepto = "Sin descripción";
-    snap.forEach(doc => concepto = doc.data()["Concepto"]);
-    lista.push({ codigo, concepto, cantidad });
-    renderTabla();
-    document.getElementById("codigoInput").value = "";
-    document.getElementById("cantidadInput").value = "1";
-  };
+window.agregarProducto = async () => {
+  const codigo = document.getElementById("codigoInput").value.trim();
+  const cantidad = parseInt(document.getElementById("cantidadInput").value);
+  const infoDiv = document.getElementById("infoProducto");
+
+  if (!codigo || cantidad <= 0) return;
+
+  const q = query(productosRef, where("Codigo Barra", "==", codigo));
+  const snap = await getDocs(q);
+
+  if (snap.empty) {
+    infoDiv.innerHTML = `<p style="color:red;">Producto no encontrado</p>`;
+    return;
+  }
+
+  let concepto = "Sin descripción";
+  snap.forEach(doc => concepto = doc.data()["Concepto"]);
+
+  infoDiv.innerHTML = `<strong>Descripción:</strong> ${concepto}`;
+
+  lista.push({ codigo, concepto, cantidad });
+  renderTabla();
+
+  document.getElementById("codigoInput").value = "";
+  document.getElementById("cantidadInput").value = "1";
+};
 
   function renderTabla() {
     tablaBody.innerHTML = "";
